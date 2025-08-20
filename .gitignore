@@ -1,0 +1,14 @@
+# Ambiente Virtual do Python
+venv/
+__pycache__/
+
+# Chave de serviço do Firebase (MUITO IMPORTANTE)
+firebase-service-account.json
+
+# Arquivos de variáveis de ambiente
+.env
+
+# Arquivos de sistema operacional e IDEs
+.DS_Store
+.vscode/
+.idea/
