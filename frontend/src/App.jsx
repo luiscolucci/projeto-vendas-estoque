@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import EditProductModal from './components/EditProductModal.jsx';
 
 function App() {
   const [products, setProducts] = useState([]);
@@ -8,9 +9,8 @@ function App() {
   const [precoVenda, setPrecoVenda] = useState('');
   const [precoCusto, setPrecoCusto] = useState('');
   const [quantidadeEstoque, setQuantidadeEstoque] = useState('');
-
-  // --- NOVIDADE: Estado para rastrear os produtos selecionados ---
   const [selectedProducts, setSelectedProducts] = useState([]);
+  const [editingProduct, setEditingProduct] = useState(null);
 
   const fetchProducts = () => {
     fetch('http://localhost:5000/api/produtos')
@@ -40,44 +40,42 @@ function App() {
     .catch(error => console.error('Erro ao criar produto:', error));
   };
 
-  // --- NOVIDADE: Função para lidar com a mudança do checkbox ---
   const handleCheckboxChange = (productId) => {
     setSelectedProducts(prevSelected => {
-      // Se o ID já está na lista, removemos (desmarcar)
       if (prevSelected.includes(productId)) {
         return prevSelected.filter(id => id !== productId);
-      }
-      // Se não está, adicionamos (marcar)
-      else {
+      } else {
         return [...prevSelected, productId];
       }
     });
   };
 
-  // --- NOVIDADE: Função para deletar os produtos selecionados ---
   const handleBulkDelete = () => {
-    if (selectedProducts.length === 0) {
-      alert('Por favor, selecione ao menos um produto para deletar.');
-      return;
-    }
-
+    if (selectedProducts.length === 0) return;
     if (window.confirm(`Tem certeza que deseja deletar ${selectedProducts.length} produto(s)?`)) {
-      // Criamos uma promessa de deleção para cada produto selecionado
-      const deletePromises = selectedProducts.map(productId =>
-        fetch(`http://localhost:5000/api/produtos/${productId}`, {
-          method: 'DELETE',
-        })
-      );
-
-      // Promise.all espera todas as promessas terminarem
+      const deletePromises = selectedProducts.map(id => fetch(`http://localhost:5000/api/produtos/${id}`, { method: 'DELETE' }));
       Promise.all(deletePromises)
         .then(() => {
-          console.log('Produtos selecionados deletados com sucesso.');
-          fetchProducts(); // Atualiza a lista de produtos
-          setSelectedProducts([]); // Limpa a seleção
+          fetchProducts();
+          setSelectedProducts([]);
         })
         .catch(error => console.error('Erro ao deletar produtos:', error));
     }
+  };
+  
+  const handleUpdateProduct = (updatedProduct) => {
+    fetch(`http://localhost:5000/api/produtos/${updatedProduct.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify(updatedProduct),
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Produto atualizado com sucesso:', data);
+      setEditingProduct(null);
+      fetchProducts();
+    })
+    .catch(error => console.error('Erro ao atualizar produto:', error));
   };
 
   return (
@@ -88,10 +86,17 @@ function App() {
       </header>
 
       <main>
-        {/* ... (Seção do formulário continua igual) ... */}
         <section className="form-section">
           <h3>Cadastrar Novo Produto</h3>
-          {/* ... (o código do form não muda) ... */}
+          {/* O FORMULÁRIO COMPLETO ESTÁ AQUI AGORA */}
+          <form onSubmit={handleSubmit}>
+            <input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do Produto" required />
+            <input type="text" value={descricao} onChange={e => setDescricao(e.target.value)} placeholder="Descrição" />
+            <input type="number" value={precoVenda} onChange={e => setPrecoVenda(e.target.value)} placeholder="Preço de Venda" required step="0.01" />
+            <input type="number" value={precoCusto} onChange={e => setPrecoCusto(e.target.value)} placeholder="Preço de Custo" step="0.01" />
+            <input type="number" value={quantidadeEstoque} onChange={e => setQuantidadeEstoque(e.target.value)} placeholder="Estoque Inicial" required />
+            <button type="submit">Salvar Produto</button>
+          </form>
         </section>
 
         <hr />
@@ -99,7 +104,6 @@ function App() {
         <section className="product-list-section">
           <div className="list-header">
             <h3>Produtos Cadastrados</h3>
-            {/* --- NOVIDADE: O botão de deletar só aparece se houver itens selecionados --- */}
             {selectedProducts.length > 0 && (
               <button onClick={handleBulkDelete} className="delete-button">
                 Deletar Selecionados ({selectedProducts.length})
@@ -108,7 +112,6 @@ function App() {
           </div>
           <div className="product-list">
             {products.map(product => (
-              // Apenas renomeamos a classe aqui de "product-card" para "product-row"
               <div key={product.id} className="product-row">
                 <input
                   type="checkbox"
@@ -118,11 +121,22 @@ function App() {
                 <h4>{product.nome}</h4>
                 <p>Estoque: {product.quantidadeEstoque}</p>
                 <p>Preço: R$ {product.precoVenda}</p>
+                <button onClick={() => setEditingProduct(product)} className="edit-button">
+                  Editar
+                </button>
               </div>
             ))}
           </div>
         </section>
       </main>
+
+      {editingProduct && (
+        <EditProductModal
+          product={editingProduct}
+          onSave={handleUpdateProduct}
+          onClose={() => setEditingProduct(null)}
+        />
+      )}
     </div>
   );
 }
