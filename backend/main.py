@@ -61,6 +61,33 @@ def listar_produtos():
         return jsonify(todos_produtos), 200
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 400
+    
+# A linha do @app.route não tem recuo
+@app.route('/api/produtos/<string:product_id>', methods=['PUT'])
+# A linha do def não tem recuo
+def atualizar_produto(product_id):
+    # A linha do try tem UM nível de recuo (4 espaços)
+    try:
+        # As linhas aqui dentro têm DOIS níveis de recuo (8 espaços)
+        dados_atualizacao = request.get_json()
+        produtos_ref.document(product_id).update(dados_atualizacao)
+        print(f"🔄 Produto atualizado com ID: {product_id}")
+        return jsonify({"status": "sucesso", "id": product_id}), 200
+    # O except está alinhado com o try (UM nível de recuo)
+    except Exception as e:
+        # As linhas aqui dentro têm DOIS níveis de recuo
+        return jsonify({"status": "erro", "message": str(e)}), 400
+
+# Um espaço em branco entre as funções para organizar
+@app.route('/api/produtos/<string:product_id>', methods=['DELETE'])
+def deletar_produto(product_id):
+    # Mesma lógica de recuo aqui
+    try:
+        produtos_ref.document(product_id).delete()
+        print(f"🗑️ Produto deletado com ID: {product_id}")
+        return jsonify({"status": "sucesso", "id": product_id}), 200
+    except Exception as e:
+        return jsonify({"status": "erro", "message": str(e)}), 400
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
