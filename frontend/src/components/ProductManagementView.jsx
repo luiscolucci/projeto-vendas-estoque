@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import EditProductModal from './EditProductModal.jsx';
-import './ProductManagementView.css'; // Criaremos este CSS
+import './ProductManagementView.css';
 
-// Este componente recebe a lista de produtos e a função para buscá-los do App.jsx
 export default function ProductManagementView({ products, fetchProducts }) {
   const [nome, setNome] = useState('');
   const [descricao, setDescricao] = useState('');
@@ -24,7 +23,7 @@ export default function ProductManagementView({ products, fetchProducts }) {
     .then(res => res.json())
     .then(() => {
       setNome(''); setDescricao(''); setPrecoVenda(''); setPrecoCusto(''); setQuantidadeEstoque('');
-      fetchProducts(); // Avisa o App para buscar a lista atualizada
+      fetchProducts();
     })
     .catch(error => console.error('Erro ao criar produto:', error));
   };
@@ -63,8 +62,14 @@ export default function ProductManagementView({ products, fetchProducts }) {
     <div className="product-management-view">
       <section className="form-section">
         <h3>Cadastrar Novo Produto</h3>
+        {/* --- O FORMULÁRIO COMPLETO ESTÁ AQUI AGORA --- */}
         <form onSubmit={handleSubmit}>
-          {/* ... (código do formulário que já conhecemos) ... */}
+            <input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do Produto" required />
+            <input type="text" value={descricao} onChange={e => setDescricao(e.target.value)} placeholder="Descrição" />
+            <input type="number" value={precoVenda} onChange={e => setPrecoVenda(e.target.value)} placeholder="Preço de Venda" required step="0.01" />
+            <input type="number" value={precoCusto} onChange={e => setPrecoCusto(e.target.value)} placeholder="Preço de Custo" step="0.01" />
+            <input type="number" value={quantidadeEstoque} onChange={e => setQuantidadeEstoque(e.target.value)} placeholder="Estoque Inicial" required />
+            <button type="submit">Salvar Produto</button>
         </form>
       </section>
 
@@ -89,8 +94,8 @@ export default function ProductManagementView({ products, fetchProducts }) {
                 />
                 <h4>{product.nome}</h4>
                 <p>Estoque: {product.quantidadeEstoque}</p>
-                <p>Preço Custo: R$ {product.precoCusto.toFixed(2)}</p>
-                <p>Preço Venda: R$ {product.precoVenda.toFixed(2)}</p>
+                <p>Custo: R$ {product.precoCusto ? product.precoCusto.toFixed(2) : '0.00'}</p>
+                <p>Venda: R$ {product.precoVenda.toFixed(2)}</p>
                 <button onClick={() => setEditingProduct(product)} className="edit-button">
                   Editar
                 </button>
