@@ -1,21 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import './SalesView.css';
 
-export default function SalesView() {
-  const [products, setProducts] = useState([]);
+// O componente agora recebe 'products' e 'fetchProducts' do seu pai (App.jsx)
+export default function SalesView({ products, fetchProducts }) {
   const [cart, setCart] = useState([]);
 
-  const fetchProducts = () => {
-    fetch('http://localhost:5000/api/produtos', { cache: 'no-cache' })
-      .then(response => response.json())
-      .then(data => setProducts(data))
-      .catch(error => console.error('Erro ao buscar produtos:', error));
-  };
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-  
   const handleAddToCart = (productToAdd) => {
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.id === productToAdd.id);
@@ -78,7 +67,8 @@ export default function SalesView() {
     .then(data => {
       alert('Venda registrada com sucesso!');
       setCart([]);
-      fetchProducts();
+      // AVISAMOS O COMPONENTE PAI PARA ATUALIZAR A LISTA DE PRODUTOS
+      fetchProducts(); 
     })
     .catch(error => {
       alert(`Erro ao finalizar a venda: ${error.message}`);

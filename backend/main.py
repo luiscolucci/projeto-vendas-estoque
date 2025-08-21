@@ -158,6 +158,34 @@ def registrar_venda():
         print(f"❌ Erro ao registrar venda: {e}")
         return jsonify({"status": "erro", "message": str(e)}), 400
     
+# Adicione esta nova rota ao seu arquivo main.py
+
+@app.route('/api/vendas', methods=['GET'])
+def listar_vendas():
+    """Busca e retorna todas as vendas registradas no banco de dados."""
+    try:
+        todas_vendas = []
+        # O .stream() busca todos os documentos. Usamos .order_by() para trazer as mais recentes primeiro.
+        vendas_stream = vendas_ref.order_by(
+            'dataVenda', direction=firestore.Query.DESCENDING
+        ).stream()
+
+        for venda in vendas_stream:
+            venda_data = venda.to_dict()
+            # Adiciona o ID do documento da venda aos dados
+            venda_data['id'] = venda.id
+            
+            # Converte o timestamp para uma string legível (ISO 8601)
+            if 'dataVenda' in venda_data and venda_data['dataVenda']:
+                 venda_data['dataVenda'] = venda_data['dataVenda'].isoformat()
+
+            todas_vendas.append(venda_data)
+            
+        return jsonify(todas_vendas), 200
+    except Exception as e:
+        print(f"❌ Erro ao listar vendas: {e}")
+        return jsonify({"status": "erro", "message": str(e)}), 500
+    
 # --- PONTO DE ENTRADA ---
 
 if __name__ == '__main__':
