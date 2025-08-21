@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import SalesView from './components/SalesView';
 import HistoryView from './components/HistoryView';
+import DashboardView from './components/DashboardView';
 import './App.css';
 
 function App() {
-  const [activeView, setActiveView] = useState('sales');
+  const [activeView, setActiveView] = useState('dashboard');
   
   // O ESTADO DOS PRODUTOS AGORA VIVE AQUI, NO COMPONENTE PAI!
   const [products, setProducts] = useState([]);
@@ -28,33 +29,29 @@ function App() {
       <header>
         <h1>Lume Cume - Aromaterapia</h1>
         <nav>
-          <button 
-            onClick={() => setActiveView('sales')} 
-            className={activeView === 'sales' ? 'active' : ''}
-          >
+           {/* 3. Adicionar o novo botão */}
+          <button onClick={() => setActiveView('dashboard')} className={activeView === 'dashboard' ? 'active' : ''}>
+            Dashboard
+          </button>
+          <button onClick={() => setActiveView('sales')} className={activeView === 'sales' ? 'active' : ''}>
             Frente de Caixa
           </button>
-          <button 
-            onClick={() => setActiveView('history')}
-            className={activeView === 'history' ? 'active' : ''}
-          >
+          <button onClick={() => setActiveView('history')} className={activeView === 'history' ? 'active' : ''}>
             Histórico de Vendas
           </button>
         </nav>
       </header>
       
+      {/* 4. Adicionar a nova visualização */}
+      <div style={{ display: activeView === 'dashboard' ? 'block' : 'none' }}>
+        <DashboardView />
+      </div>
       <div style={{ display: activeView === 'sales' ? 'block' : 'none' }}>
-        {/* Passamos a lista de produtos e a função para o SalesView */}
-        <SalesView 
-          products={products} 
-          setProducts={setProducts} 
-          fetchProducts={fetchProducts} 
-        />
+        <SalesView products={products} fetchProducts={fetchProducts} />
       </div>
       <div style={{ display: activeView === 'history' ? 'block' : 'none' }}>
         <HistoryView />
       </div>
-
     </div>
   );
 }

@@ -186,6 +186,76 @@ def listar_vendas():
         print(f"❌ Erro ao listar vendas: {e}")
         return jsonify({"status": "erro", "message": str(e)}), 500
     
+# Adicione esta nova rota ao seu arquivo main.py
+
+from datetime import datetime, timedelta
+
+@app.route('/api/dashboard-data', methods=['GET'])
+def get_dashboard_data():
+    """
+    Calcula e retorna os dados agregados para o dashboard.
+    """
+    try:
+        # 1. Buscar todos os produtos para ter um mapa de ID -> precoCusto
+        produtos_map = {p.id: p.to_dict() for p in produtos_ref.stream()}
+
+        # 2. Buscar todas as vendas
+        vendas = list(vendas_ref.stream())
+
+        # 3. Calcular os totais
+        faturamento_bruto = 0
+        custo_total = 0
+        total_itens_vendidos = 0
+        vendas_por_dia = {} # Usaremos um dicionário para agrupar
+
+        for venda in vendas:
+            venda_data = venda.to_dict()
+            faturamento_bruto += venda_data.get('valorTotal', 0)
+            
+            # Calcula o custo dos produtos para esta venda
+            for item in venda_data.get('itens', []):
+                produto_id = item.get('produtoId')
+                quantidade = item.get('quantidade')
+                total_itens_vendidos += quantidade
+                
+                # Busca o precoCusto do produto no mapa que criamos
+                if produto_id in produtos_map:
+                    custo_total += produtos_map[produto_id].get('precoCusto', 0) * quantidade
+
+            # Agrupa as vendas por dia para o gráfico
+            data_venda = venda_data.get('dataVenda')
+            if data_venda:
+                # Formata a data para 'ANO-MÊS-DIA'
+                dia = data_venda.strftime('%Y-%m-%d')
+                if dia not in vendas_por_dia:
+                    vendas_por_dia[dia] = 0
+                vendas_por_dia[dia] += venda_data.get('valorTotal', 0)
+
+        lucro_liquido = faturamento_bruto - custo_total
+        
+        # Converte o dicionário de vendas por dia em uma lista ordenada
+        vendas_por_dia_lista = sorted(
+            [{"data": dia, "total": total} for dia, total in vendas_por_dia.items()],
+            key=lambda x: x['data']
+        )
+
+        # 4. Monta o objeto de resposta
+        dashboard_data = {
+            "resumo": {
+                "faturamentoBruto": faturamento_bruto,
+                "lucroLiquido": lucro_liquido,
+                "totalVendas": len(vendas),
+                "totalItensVendidos": total_itens_vendidos
+            },
+            "vendasPorDia": vendas_por_dia_lista
+        }
+        
+        return jsonify(dashboard_data), 200
+
+    except Exception as e:
+        print(f"❌ Erro ao gerar dados do dashboard: {e}")
+        return jsonify({"status": "erro", "message": str(e)}), 500
+    
 # --- PONTO DE ENTRADA ---
 
 if __name__ == '__main__':
