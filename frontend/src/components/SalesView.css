@@ -83,3 +83,23 @@
     justify-content: center;
     align-items: center;
 }
+
+@media (max-width: 768px) {
+  .sales-view {
+    /* Muda o layout de grid para bloco, fazendo as colunas ficarem uma sobre a outra */
+    display: block;
+  }
+
+  .product-selection {
+    margin-bottom: 2rem; /* Adiciona um espaço entre a lista de produtos e o carrinho */
+  }
+
+  /* Opcional: Aumenta um pouco a fonte nos títulos para melhorar a leitura */
+  h1 {
+    font-size: 1.8rem;
+  }
+  
+  h2 {
+    font-size: 1.3rem;
+  }
+}
