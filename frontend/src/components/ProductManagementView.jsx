@@ -29,7 +29,17 @@ export default function ProductManagementView({ products, fetchProducts }) {
   };
 
   const handleCheckboxChange = (productId) => {
-    setSelectedProducts(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
+    // Usamos o formato de callback para garantir que estamos sempre usando a versão mais recente do estado
+    setSelectedProducts(prevSelected => {
+      // Se o ID já está na lista, criamos uma nova lista filtrando-o para fora (desmarcar)
+      if (prevSelected.includes(productId)) {
+        return prevSelected.filter(id => id !== productId);
+      } 
+      // Se não está na lista, criamos uma nova lista adicionando o novo ID (marcar)
+      else {
+        return [...prevSelected, productId];
+      }
+    });
   };
 
   const handleBulkDelete = () => {
