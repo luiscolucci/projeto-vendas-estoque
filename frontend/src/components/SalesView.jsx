@@ -1,80 +1,80 @@
 import { useState } from 'react';
+import { getAuth } from "firebase/auth";
 import './SalesView.css';
 
-// O componente agora recebe 'products' e 'fetchProducts' do seu pai (App.jsx)
 export default function SalesView({ products, fetchProducts }) {
   const [cart, setCart] = useState([]);
+  const auth = getAuth();
 
+  // Adiciona um item ao carrinho ou incrementa sua quantidade
   const handleAddToCart = (productToAdd) => {
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.id === productToAdd.id);
       if (existingItem) {
-        const newQuantity = existingItem.quantidade + 1;
-        if (newQuantity > existingItem.quantidadeEstoque) {
-            alert(`Estoque máximo atingido para ${existingItem.nome}`);
-            return prevCart;
-        }
         return prevCart.map(item =>
-          item.id === productToAdd.id ? { ...item, quantidade: newQuantity } : item
+          item.id === productToAdd.id
+            ? { ...item, quantidade: item.quantidade + 1 }
+            : item
         );
+      } else {
+        return [...prevCart, { ...productToAdd, quantidade: 1 }];
       }
-      return [...prevCart, { ...productToAdd, quantidade: 1 }];
     });
   };
 
+  // Atualiza a quantidade de um item específico no carrinho
   const handleUpdateQuantity = (productId, newQuantity) => {
     if (newQuantity <= 0) {
       setCart(prevCart => prevCart.filter(item => item.id !== productId));
-      return;
+    } else {
+      setCart(prevCart =>
+        prevCart.map(item =>
+          item.id === productId ? { ...item, quantidade: newQuantity } : item
+        )
+      );
     }
-    setCart(prevCart =>
-      prevCart.map(item => {
-        if (item.id === productId) {
-          if (newQuantity > item.quantidadeEstoque) {
-            alert(`Estoque máximo atingido para ${item.nome}`);
-            return item;
-          }
-          return { ...item, quantidade: newQuantity };
-        }
-        return item;
-      })
-    );
   };
 
-  const handleFinalizeSale = () => {
+  // Finaliza a venda, enviando os dados para o backend
+  const handleFinalizeSale = async () => {
     if (cart.length === 0) {
       alert("O carrinho está vazio!");
       return;
     }
+
     const salePayload = {
-      vendedorId: "user_01",
-      vendedorNome: "Admin",
       pagamento: { metodo: "Dinheiro", parcelas: 1 },
-      itens: cart.map(item => ({ produtoId: item.id, quantidade: item.quantidade }))
+      itens: cart.map(item => ({
+        produtoId: item.id,
+        quantidade: item.quantidade
+      }))
     };
 
-    fetch('http://localhost:5000/api/vendas', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify(salePayload),
-    })
-    .then(response => {
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const response = await fetch('http://localhost:5000/api/vendas', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        },
+        body: JSON.stringify(salePayload),
+      });
+
       if (!response.ok) {
-        return response.json().then(err => { throw new Error(err.message) });
+        const err = await response.json();
+        throw new Error(err.message);
       }
-      return response.json();
-    })
-    .then(data => {
+
+      await response.json();
       alert('Venda registrada com sucesso!');
       setCart([]);
-      // AVISAMOS O COMPONENTE PAI PARA ATUALIZAR A LISTA DE PRODUTOS
-      fetchProducts(); 
-    })
-    .catch(error => {
+      fetchProducts(); // Atualiza os produtos na tela
+    } catch (error) {
       alert(`Erro ao finalizar a venda: ${error.message}`);
-    });
+    }
   };
-  
+
   return (
     <main className="sales-view">
       <div className="product-selection">
@@ -83,7 +83,10 @@ export default function SalesView({ products, fetchProducts }) {
           {products.map(product => {
             const itemInCart = cart.find(item => item.id === product.id);
             const quantityInCart = itemInCart ? itemInCart.quantidade : 0;
-            const availableStock = product.quantidadeEstoque - quantityInCart;
+
+            // Aceita tanto "quantidadeEstoque" quanto "estoque"
+            const availableStock =
+              (product.quantidadeEstoque ?? product.estoque ?? 0) - quantityInCart;
 
             return (
               <div key={product.id} className="product-item-sales">
@@ -119,11 +122,11 @@ export default function SalesView({ products, fetchProducts }) {
           )}
         </div>
         <button 
-            className="finalize-sale-button" 
-            disabled={cart.length === 0}
-            onClick={handleFinalizeSale}
+          className="finalize-sale-button" 
+          disabled={cart.length === 0}
+          onClick={handleFinalizeSale}
         >
-            Finalizar Venda
+          Finalizar Venda
         </button>
       </div>
     </main>

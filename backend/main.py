@@ -1,8 +1,11 @@
-from flask_cors import CORS
 import os
+from datetime import datetime
+from functools import wraps
+
 import firebase_admin
-from firebase_admin import credentials, firestore
-from flask import Flask, jsonify, request
+from firebase_admin import auth, credentials, firestore
+from flask import Flask, jsonify, request, g
+from flask_cors import CORS
 
 # --- INICIALIZAÇÃO ---
 app = Flask(__name__)
@@ -14,46 +17,118 @@ print("🔥 Conexão com Firebase estabelecida com sucesso!")
 
 db = firestore.client()
 produtos_ref = db.collection('produtos')
-vendas_ref = db.collection('vendas') # Referência para a coleção de vendas
+vendas_ref = db.collection('vendas')
+
+# --- DECORADORES DE SEGURANÇA ---
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        id_token = request.headers.get('Authorization')
+        if not id_token or 'Bearer ' not in id_token:
+            return jsonify({'message': 'Token de autenticação ausente ou mal formatado.'}), 401
+        
+        try:
+            id_token = id_token.split('Bearer ')[1]
+            decoded_token = auth.verify_id_token(id_token)
+            
+            user_doc = firestore.client().collection('users').document(decoded_token['uid']).get()
+            if not user_doc.exists:
+                return jsonify({'message': 'Usuário não encontrado no Firestore.'}), 404
+            
+            g.user = decoded_token
+            g.user['role'] = user_doc.to_dict().get('role')
+            
+        except Exception as e:
+            print(f"Erro na autenticação: {e}")
+            return jsonify({'message': 'Token de autenticação inválido ou expirado.'}), 403
+        
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if g.user.get('role') != 'admin':
+            return jsonify({'message': 'Acesso negado: Requer privilégios de administrador.'}), 403
+        return f(*args, **kwargs)
+    return decorated
 
 # --- ROTAS DA API ---
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Verifica se o backend está no ar."""
-    return jsonify({"status": "ok", "message": "Backend da Lume Cume está no ar!"}), 200
+    return jsonify({"status": "ok"}), 200
 
-# --- ROTAS DE PRODUTOS (CRUD) ---
+# Rotas de Produto para o Admin (CRUD completo)
+@app.route('/api/produtos', methods=['GET'])
+@token_required
+def listar_produtos():
+    try:
+        produtos = []
+        for doc in produtos_ref.stream():
+            produto = doc.to_dict()
+            produto['id'] = doc.id
+            produtos.append(produto)
+        return jsonify(produtos), 200
+    except Exception as e:
+        return jsonify({"status": "erro", "message": str(e)}), 500
 
 @app.route('/api/produtos', methods=['POST'])
+@token_required
+@admin_required
 def criar_produto():
-    """Cria um novo produto no banco de dados."""
     try:
         dados_produto = request.get_json()
+
+        # Normalizar nomes dos campos
+        if 'estoque' in dados_produto and 'quantidadeEstoque' not in dados_produto:
+            dados_produto['quantidadeEstoque'] = dados_produto.pop('estoque')
+
+        if 'preco' in dados_produto and 'precoVenda' not in dados_produto:
+            dados_produto['precoVenda'] = dados_produto.pop('preco')
+
         update_time, doc_ref = produtos_ref.add(dados_produto)
         print(f"✅ Produto adicionado com ID: {doc_ref.id}")
         return jsonify({"status": "sucesso", "id": doc_ref.id}), 201
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 400
 
-@app.route('/api/produtos', methods=['GET'])
-def listar_produtos():
-    """Lista todos os produtos do banco de dados."""
+
+@app.route('/api/produtos/<string:product_id>', methods=['PUT'])
+@token_required
+@admin_required
+def atualizar_produto(product_id):
     try:
-        todos_produtos = []
-        for doc in produtos_ref.stream():
-            produto = doc.to_dict()
-            produto['id'] = doc.id
-            todos_produtos.append(produto)
-        return jsonify(todos_produtos), 200
+        dados_atualizacao = request.get_json()
+
+        # Normalizar nomes dos campos
+        if 'estoque' in dados_atualizacao:
+            dados_atualizacao['quantidadeEstoque'] = dados_atualizacao.pop('estoque')
+
+        if 'preco' in dados_atualizacao:
+            dados_atualizacao['precoVenda'] = dados_atualizacao.pop('preco')
+
+        produtos_ref.document(product_id).update(dados_atualizacao)
+        print(f"🔄 Produto atualizado com ID: {product_id}")
+        return jsonify({"status": "sucesso", "id": product_id}), 200
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 400
 
 @app.route('/api/produtos/<string:product_id>', methods=['PUT'])
-def atualizar_produto(product_id):
-    """Atualiza um produto existente pelo seu ID."""
+@token_required
+@admin_required
+def atualizar_produto_route(product_id):   # <<< novo nome da função
     try:
         dados_atualizacao = request.get_json()
+
+        # Normalizar nomes dos campos
+        if 'estoque' in dados_atualizacao:
+            dados_atualizacao['quantidadeEstoque'] = dados_atualizacao.pop('estoque')
+
+        if 'preco' in dados_atualizacao:
+            dados_atualizacao['precoVenda'] = dados_atualizacao.pop('preco')
+
         produtos_ref.document(product_id).update(dados_atualizacao)
         print(f"🔄 Produto atualizado com ID: {product_id}")
         return jsonify({"status": "sucesso", "id": product_id}), 200
@@ -61,8 +136,9 @@ def atualizar_produto(product_id):
         return jsonify({"status": "erro", "message": str(e)}), 400
 
 @app.route('/api/produtos/<string:product_id>', methods=['DELETE'])
+@token_required
+@admin_required
 def deletar_produto(product_id):
-    """Deleta um produto existente pelo seu ID."""
     try:
         produtos_ref.document(product_id).delete()
         print(f"🗑️ Produto deletado com ID: {product_id}")
@@ -70,11 +146,10 @@ def deletar_produto(product_id):
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 400
 
-# --- ROTA DE VENDAS ---
-
-# Substitua a sua função @app.route('/api/vendas', ...) por esta
+# --- ROTAS DE VENDAS ---
 
 @app.route('/api/vendas', methods=['POST'])
+@token_required
 def registrar_venda():
     """Registra uma nova venda, atualizando o estoque de forma atômica."""
     try:
@@ -85,15 +160,11 @@ def registrar_venda():
             itens_vendidos = dados_venda.get('itens', [])
             if not itens_vendidos:
                 raise Exception("A lista de itens vendidos não pode estar vazia.")
-
+            
             valor_total_venda = 0
             itens_com_detalhes = []
-            
-            # Lista temporária para guardar as informações que lemos
             produtos_para_atualizar = []
 
-            # --- ETAPA 1: LER TUDO PRIMEIRO ---
-            # Este primeiro loop apenas lê os dados e faz as verificações.
             for item in itens_vendidos:
                 produto_id = item.get('produtoId')
                 quantidade_vendida = item.get('quantidade')
@@ -105,39 +176,48 @@ def registrar_venda():
                     raise Exception(f"Produto com ID {produto_id} não encontrado.")
 
                 produto_data = produto_snapshot.to_dict()
-                estoque_atual = produto_data.get('quantidadeEstoque', 0)
+
+                # Aceita tanto "estoque" quanto "quantidadeEstoque"
+                estoque_atual = (
+                    produto_data.get('quantidadeEstoque')
+                    if 'quantidadeEstoque' in produto_data
+                    else produto_data.get('estoque', 0)
+                )
 
                 if estoque_atual < quantidade_vendida:
-                    raise Exception(f"Estoque insuficiente para o produto '{produto_data.get('nome')}'.")
+                    raise Exception(f"Estoque insuficiente para '{produto_data.get('nome')}'.")
 
-                # Guarda as informações necessárias para a etapa de escrita
                 produtos_para_atualizar.append({
                     "ref": produto_ref,
                     "novo_estoque": estoque_atual - quantidade_vendida
                 })
 
-                # Calcula o valor total e prepara os detalhes para o registro da venda
-                valor_item = produto_data.get('precoVenda', 0) * quantidade_vendida
+                # Aceita tanto "precoVenda" quanto "preco"
+                preco_unitario = (
+                    produto_data.get('precoVenda')
+                    if 'precoVenda' in produto_data
+                    else produto_data.get('preco', 0)
+                )
+
+                valor_item = preco_unitario * quantidade_vendida
                 valor_total_venda += valor_item
+
                 itens_com_detalhes.append({
                     'produtoId': produto_id,
                     'nomeProduto': produto_data.get('nome'),
                     'quantidade': quantidade_vendida,
-                    'precoUnitarioVenda': produto_data.get('precoVenda')
+                    'precoUnitarioVenda': preco_unitario
                 })
 
-            # --- ETAPA 2: ESCREVER TUDO DEPOIS ---
-            # Agora que já lemos tudo, podemos fazer todas as escritas.
-            
-            # Atualiza o estoque de cada produto
+            # Atualiza os estoques
             for prod in produtos_para_atualizar:
                 transaction.update(prod["ref"], {'quantidadeEstoque': prod["novo_estoque"]})
 
-            # Cria o registro da venda
+            # Cria registro da venda
             registro_venda = {
                 'dataVenda': firestore.SERVER_TIMESTAMP,
-                'vendedorId': dados_venda.get('vendedorId'),
-                'vendedorNome': dados_venda.get('vendedorNome'),
+                'vendedorId': g.user['uid'],
+                'vendedorNome': g.user.get('name', g.user.get('email')),
                 'pagamento': dados_venda.get('pagamento'),
                 'itens': itens_com_detalhes,
                 'valorTotal': valor_total_venda
@@ -147,85 +227,63 @@ def registrar_venda():
             
             return nova_venda_ref.id
 
-        # Executa a transação
         transaction = db.transaction()
         venda_id = processar_venda(transaction)
         
         print(f"💰 Venda registrada com sucesso! ID: {venda_id}")
-        return jsonify({"status": "sucesso", "message": "Venda registrada com sucesso!", "vendaId": venda_id}), 201
-
+        return jsonify({"status": "sucesso", "vendaId": venda_id}), 201
     except Exception as e:
         print(f"❌ Erro ao registrar venda: {e}")
         return jsonify({"status": "erro", "message": str(e)}), 400
-    
-# Adicione esta nova rota ao seu arquivo main.py
+
 
 @app.route('/api/vendas', methods=['GET'])
+@token_required
 def listar_vendas():
-    """Busca e retorna todas as vendas registradas no banco de dados."""
     try:
         todas_vendas = []
-        # O .stream() busca todos os documentos. Usamos .order_by() para trazer as mais recentes primeiro.
         vendas_stream = vendas_ref.order_by(
             'dataVenda', direction=firestore.Query.DESCENDING
         ).stream()
-
         for venda in vendas_stream:
             venda_data = venda.to_dict()
-            # Adiciona o ID do documento da venda aos dados
             venda_data['id'] = venda.id
-            
-            # Converte o timestamp para uma string legível (ISO 8601)
             if 'dataVenda' in venda_data and venda_data['dataVenda']:
                  venda_data['dataVenda'] = venda_data['dataVenda'].isoformat()
-
             todas_vendas.append(venda_data)
-            
         return jsonify(todas_vendas), 200
     except Exception as e:
-        print(f"❌ Erro ao listar vendas: {e}")
         return jsonify({"status": "erro", "message": str(e)}), 500
-    
-# Adicione esta nova rota ao seu arquivo main.py
 
-from datetime import datetime, timedelta
+# --- ROTA DE DASHBOARD ---
 
 @app.route('/api/dashboard-data', methods=['GET'])
+@token_required
+@admin_required
 def get_dashboard_data():
-    """
-    Calcula e retorna os dados agregados para o dashboard.
-    """
     try:
-        # 1. Buscar todos os produtos para ter um mapa de ID -> precoCusto
         produtos_map = {p.id: p.to_dict() for p in produtos_ref.stream()}
-
-        # 2. Buscar todas as vendas
         vendas = list(vendas_ref.stream())
 
-        # 3. Calcular os totais
         faturamento_bruto = 0
         custo_total = 0
         total_itens_vendidos = 0
-        vendas_por_dia = {} # Usaremos um dicionário para agrupar
+        vendas_por_dia = {}
 
         for venda in vendas:
             venda_data = venda.to_dict()
             faturamento_bruto += venda_data.get('valorTotal', 0)
             
-            # Calcula o custo dos produtos para esta venda
             for item in venda_data.get('itens', []):
                 produto_id = item.get('produtoId')
                 quantidade = item.get('quantidade')
                 total_itens_vendidos += quantidade
                 
-                # Busca o precoCusto do produto no mapa que criamos
-                if produto_id in produtos_map:
-                    custo_total += produtos_map[produto_id].get('precoCusto', 0) * quantidade
+                if produto_id in produtos_map and produtos_map[produto_id].get('precoCusto'):
+                    custo_total += produtos_map[produto_id]['precoCusto'] * quantidade
 
-            # Agrupa as vendas por dia para o gráfico
             data_venda = venda_data.get('dataVenda')
-            if data_venda:
-                # Formata a data para 'ANO-MÊS-DIA'
+            if data_venda and isinstance(data_venda, datetime):
                 dia = data_venda.strftime('%Y-%m-%d')
                 if dia not in vendas_por_dia:
                     vendas_por_dia[dia] = 0
@@ -233,13 +291,11 @@ def get_dashboard_data():
 
         lucro_liquido = faturamento_bruto - custo_total
         
-        # Converte o dicionário de vendas por dia em uma lista ordenada
         vendas_por_dia_lista = sorted(
             [{"data": dia, "total": total} for dia, total in vendas_por_dia.items()],
             key=lambda x: x['data']
         )
 
-        # 4. Monta o objeto de resposta
         dashboard_data = {
             "resumo": {
                 "faturamentoBruto": faturamento_bruto,
@@ -251,12 +307,9 @@ def get_dashboard_data():
         }
         
         return jsonify(dashboard_data), 200
-
     except Exception as e:
-        print(f"❌ Erro ao gerar dados do dashboard: {e}")
         return jsonify({"status": "erro", "message": str(e)}), 500
-    
-# --- PONTO DE ENTRADA ---
 
+# --- PONTO DE ENTRADA ---
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

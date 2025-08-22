@@ -1,25 +1,37 @@
 import { useState, useEffect } from 'react';
-import './HistoryView.css'; // Criaremos este CSS
+import { useAuthenticatedFetch } from '../hooks/useAuthenticatedFetch';
+import { useAuth } from '../context/AuthContext';
+import './HistoryView.css';
 
 export default function HistoryView() {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch('http://localhost:5000/api/vendas', { cache: 'no-cache' })
-      .then(response => response.json())
-      .then(data => {
-        setSales(data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error("Erro ao buscar histórico de vendas:", error);
-        setLoading(false);
-      });
-  }, []);
+  const { authenticatedFetch, token } = useAuthenticatedFetch();
+  const { user } = useAuth();
 
-  if (loading) {
+  useEffect(() => {
+    // Só tenta buscar os dados se o usuário estiver logado E o token estiver pronto
+    if (user && token) {
+      authenticatedFetch('http://localhost:5000/api/vendas', { cache: 'no-cache' })
+        .then(response => response.json())
+        .then(data => {
+          setSales(data);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error("Erro ao buscar histórico de vendas:", error);
+          setLoading(false);
+        });
+    }
+  }, [user, token]); // O useEffect roda novamente quando o token for carregado
+
+  if (loading || !token) {
     return <div>Carregando histórico...</div>;
+  }
+
+  if (!sales || sales.status === 'erro') {
+    return <div>Não foi possível carregar as vendas.</div>;
   }
 
   return (

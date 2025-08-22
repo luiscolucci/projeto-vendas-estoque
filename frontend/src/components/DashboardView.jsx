@@ -11,9 +11,10 @@ import {
   Legend,
 } from 'chart.js';
 
+import { useAuthenticatedFetch } from '../hooks/useAuthenticatedFetch';
+import { useAuth } from '../context/AuthContext';
 import './DashboardView.css';
 
-// Registra os componentes do Chart.js que vamos usar
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -27,9 +28,14 @@ ChartJS.register(
 export default function DashboardView() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  const { authenticatedFetch, token } = useAuthenticatedFetch();
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetch('http://localhost:5000/api/dashboard-data', { cache: 'no-cache' })
+    // Só tenta buscar os dados se o usuário estiver logado E o token estiver pronto
+    if (user && token) {
+      authenticatedFetch('http://localhost:5000/api/dashboard-data', { cache: 'no-cache' })
       .then(res => res.json())
       .then(apiData => {
         setData(apiData);
@@ -39,17 +45,17 @@ export default function DashboardView() {
         console.error("Erro ao buscar dados do dashboard:", error);
         setLoading(false);
       });
-  }, []);
+    }
+  }, [user, token]); // O useEffect roda novamente quando o token for carregado
 
-  if (loading) {
+  if (loading || !token) {
     return <div>Carregando dados do dashboard...</div>;
   }
   
-  if (!data) {
+  if (!data || data.status === 'erro') {
     return <div>Não foi possível carregar os dados.</div>;
   }
 
-  // Prepara os dados para o gráfico
   const chartData = {
     labels: data.vendasPorDia.map(v => new Date(v.data).toLocaleDateString('pt-BR', {timeZone: 'UTC'})),
     datasets: [

@@ -2,41 +2,82 @@ import { useState, useEffect } from 'react';
 import SalesView from './components/SalesView';
 import HistoryView from './components/HistoryView';
 import DashboardView from './components/DashboardView';
-import ProductManagementView from './components/ProductManagementView'; // Importar
+import ProductManagementView from './components/ProductManagementView';
+import LoginView from './components/LoginView';
+import { useAuth } from './context/AuthContext';
+import { useAuthenticatedFetch } from './hooks/useAuthenticatedFetch';
 import './App.css';
 
 function App() {
   const [activeView, setActiveView] = useState('dashboard');
   const [products, setProducts] = useState([]);
+  const { user, role, loading, logout } = useAuth();
+  const { authenticatedFetch, token } = useAuthenticatedFetch(); // Usamos o hook aqui!
 
-  const fetchProducts = () => {
-    fetch('http://localhost:5000/api/produtos', { cache: 'no-cache' })
-      .then(response => response.json())
-      .then(data => setProducts(data))
-      .catch(error => console.error('Erro ao buscar produtos:', error));
+  const fetchProducts = async () => {
+    if (token) {
+        try {
+            const response = await authenticatedFetch('http://localhost:5000/api/produtos', {
+                method: 'GET',
+                headers: { 'Cache-Control': 'no-cache' }
+            });
+            const data = await response.json();
+            setProducts(data);
+        } catch (error) {
+            console.error('Erro ao buscar produtos:', error);
+            setProducts([]);
+        }
+    }
   };
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    if (user && token) {
+      fetchProducts();
+    }
+  }, [user, token]); // Roda quando o user OU o token mudam
+
+  if (loading || !token) { // Espera o token carregar antes de renderizar
+    return <div>Carregando...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="app-container">
+        <header>
+          <h1>Lume Cume - Aromaterapia</h1>
+        </header>
+        <main>
+          <LoginView />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div>
       <header>
-        <h1>Lume Cume - Aromoterapia</h1>
+        <h1>Lume Cume - Aromaterapia</h1>
         <nav>
-           <button onClick={() => setActiveView('dashboard')} className={activeView === 'dashboard' ? 'active' : ''}>
-            Dashboard
-          </button>
+          {role === 'admin' && (
+            <button onClick={() => setActiveView('dashboard')} className={activeView === 'dashboard' ? 'active' : ''}>
+              Dashboard
+            </button>
+          )}
           <button onClick={() => setActiveView('sales')} className={activeView === 'sales' ? 'active' : ''}>
             Frente de Caixa
           </button>
-           <button onClick={() => setActiveView('history')} className={activeView === 'history' ? 'active' : ''}>
-            Histórico de Vendas
-          </button>
-          {/* Nova Aba */}
-          <button onClick={() => setActiveView('products')} className={activeView === 'products' ? 'active' : ''}>
-            Produtos
+          {role === 'admin' && (
+            <button onClick={() => setActiveView('history')} className={activeView === 'history' ? 'active' : ''}>
+              Histórico de Vendas
+            </button>
+          )}
+          {role === 'admin' && (
+            <button onClick={() => setActiveView('products')} className={activeView === 'products' ? 'active' : ''}>
+              Produtos
+            </button>
+          )}
+          <button onClick={logout} className="logout-button">
+            Sair
           </button>
         </nav>
       </header>
@@ -50,7 +91,6 @@ function App() {
       <div style={{ display: activeView === 'history' ? 'block' : 'none' }}>
         <HistoryView />
       </div>
-      {/* Nova Tela */}
       <div style={{ display: activeView === 'products' ? 'block' : 'none' }}>
         <ProductManagementView products={products} fetchProducts={fetchProducts} />
       </div>

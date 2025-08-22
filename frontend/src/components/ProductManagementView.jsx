@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import EditProductModal from './EditProductModal.jsx';
 import './ProductManagementView.css';
+import { useAuthenticatedFetch } from '../hooks/useAuthenticatedFetch';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProductManagementView({ products, fetchProducts }) {
   const [nome, setNome] = useState('');
@@ -10,12 +12,18 @@ export default function ProductManagementView({ products, fetchProducts }) {
   const [quantidadeEstoque, setQuantidadeEstoque] = useState('');
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null);
+  
+  const { authenticatedFetch, token } = useAuthenticatedFetch();
+  const { user } = useAuth();
+
+  // Espera o token para renderizar o resto da página
+  if (!user || !token) return <div>Carregando...</div>;
 
   const handleSubmit = (event) => {
     event.preventDefault();
     const newProduct = { nome, descricao, precoVenda: parseFloat(precoVenda), precoCusto: parseFloat(precoCusto), quantidadeEstoque: parseInt(quantidadeEstoque), categoria: "Nova Categoria" };
 
-    fetch('http://localhost:5000/api/produtos', {
+    authenticatedFetch('http://localhost:5000/api/produtos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify(newProduct),
@@ -29,22 +37,12 @@ export default function ProductManagementView({ products, fetchProducts }) {
   };
 
   const handleCheckboxChange = (productId) => {
-    // Usamos o formato de callback para garantir que estamos sempre usando a versão mais recente do estado
-    setSelectedProducts(prevSelected => {
-      // Se o ID já está na lista, criamos uma nova lista filtrando-o para fora (desmarcar)
-      if (prevSelected.includes(productId)) {
-        return prevSelected.filter(id => id !== productId);
-      } 
-      // Se não está na lista, criamos uma nova lista adicionando o novo ID (marcar)
-      else {
-        return [...prevSelected, productId];
-      }
-    });
+    setSelectedProducts(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
   };
 
   const handleBulkDelete = () => {
     if (window.confirm(`Tem certeza que deseja deletar ${selectedProducts.length} produto(s)?`)) {
-      const deletePromises = selectedProducts.map(id => fetch(`http://localhost:5000/api/produtos/${id}`, { method: 'DELETE' }));
+      const deletePromises = selectedProducts.map(id => authenticatedFetch(`http://localhost:5000/api/produtos/${id}`, { method: 'DELETE' }));
       Promise.all(deletePromises)
         .then(() => {
           fetchProducts();
@@ -55,7 +53,7 @@ export default function ProductManagementView({ products, fetchProducts }) {
   };
   
   const handleUpdateProduct = (updatedProduct) => {
-    fetch(`http://localhost:5000/api/produtos/${updatedProduct.id}`, {
+    authenticatedFetch(`http://localhost:5000/api/produtos/${updatedProduct.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json; charset=utf-8' },
       body: JSON.stringify(updatedProduct),
@@ -72,7 +70,6 @@ export default function ProductManagementView({ products, fetchProducts }) {
     <div className="product-management-view">
       <section className="form-section">
         <h3>Cadastrar Novo Produto</h3>
-        {/* --- O FORMULÁRIO COMPLETO ESTÁ AQUI AGORA --- */}
         <form onSubmit={handleSubmit}>
             <input type="text" value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do Produto" required />
             <input type="text" value={descricao} onChange={e => setDescricao(e.target.value)} placeholder="Descrição" />
