@@ -60,7 +60,6 @@ def admin_required(f):
 def health_check():
     return jsonify({"status": "ok"}), 200
 
-# Rotas de Produto para o Admin (CRUD completo)
 @app.route('/api/produtos', methods=['GET'])
 @token_required
 def listar_produtos():
@@ -109,8 +108,6 @@ def deletar_produto(product_id):
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 400
 
-# --- ROTAS DE VENDAS ---
-
 @app.route('/api/vendas', methods=['POST'])
 @token_required
 def registrar_venda():
@@ -123,7 +120,7 @@ def registrar_venda():
             itens_vendidos = dados_venda.get('itens', [])
             if not itens_vendidos:
                 raise Exception("A lista de itens vendidos não pode estar vazia.")
-            
+
             valor_total_venda = 0
             itens_com_detalhes = []
             produtos_para_atualizar = []
@@ -139,7 +136,6 @@ def registrar_venda():
                     raise Exception(f"Produto com ID {produto_id} não encontrado.")
 
                 produto_data = produto_snapshot.to_dict()
-
                 estoque_atual = (
                     produto_data.get('quantidadeEstoque')
                     if 'quantidadeEstoque' in produto_data
@@ -266,7 +262,6 @@ def get_dashboard_data():
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 500
 
-# Substitua a sua função create_user por esta
 @app.route('/api/users/create', methods=['POST'])
 @token_required
 @admin_required
@@ -299,19 +294,10 @@ def create_user():
         return jsonify({'status': 'sucesso', 'uid': new_user.uid}), 201
 
     except Exception as e:
-        # --- NOVIDADE AQUI ---
-        print("\n\n" + "-"*50)
-        print("❌ ERRO NO BACKEND AO TENTAR CRIAR USUÁRIO:")
-        print(f"Tipo do erro: {type(e)}")
-        print(f"Mensagem: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        print("-"*50 + "\n\n")
-        # --- FIM DA NOVIDADE ---
-
+        print(f"❌ Erro ao criar usuário: {e}")
         if 'EMAIL_EXISTS' in str(e):
              return jsonify({'status': 'erro', 'message': 'Este e-mail já está cadastrado.'}), 409
-        return jsonify({'status': 'erro', 'message': str(e)}), 500
+        return jsonify({"status": "erro", "message": str(e)}), 500
 
 @app.route('/api/users', methods=['GET'])
 @token_required
@@ -357,7 +343,6 @@ def enable_user(uid):
     except Exception as e:
         print(f"❌ Erro ao habilitar usuário: {e}")
         return jsonify({"status": "erro", "message": str(e)}), 500
-    
 
 # --- PONTO DE ENTRADA ---
 if __name__ == '__main__':

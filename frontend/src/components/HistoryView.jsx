@@ -3,17 +3,30 @@ import { useAuthenticatedFetch } from '../hooks/useAuthenticatedFetch';
 import { useAuth } from '../context/AuthContext';
 import './HistoryView.css';
 
-export default function HistoryView() {
+export default function HistoryView({ role }) {
   const [sales, setSales] = useState([]);
+  const [users, setUsers] = useState([]); // Novo estado para a lista de usuários
   const [loading, setLoading] = useState(true);
+
+  // Novos estados para os filtros
+  const [filterSeller, setFilterSeller] = useState('');
+  const [filterDate, setFilterDate] = useState('');
 
   const { authenticatedFetch, token } = useAuthenticatedFetch();
   const { user } = useAuth();
 
-  useEffect(() => {
-    // Só tenta buscar os dados se o usuário estiver logado E o token estiver pronto
+  const fetchSales = () => {
+    setLoading(true);
+    let url = 'http://localhost:5000/api/vendas?';
+    if (filterSeller) {
+      url += `sellerId=${filterSeller}&`;
+    }
+    if (filterDate) {
+      url += `date=${filterDate}&`;
+    }
+
     if (user && token) {
-      authenticatedFetch('http://localhost:5000/api/vendas', { cache: 'no-cache' })
+      authenticatedFetch(url, { cache: 'no-cache' })
         .then(response => response.json())
         .then(data => {
           setSales(data);
@@ -24,19 +37,47 @@ export default function HistoryView() {
           setLoading(false);
         });
     }
-  }, [user, token]); // O useEffect roda novamente quando o token for carregado
+  };
+
+  const fetchUsers = () => {
+    if (user && token && role === 'admin') {
+      authenticatedFetch('/api/users')
+        .then(res => res.json())
+        .then(data => setUsers(data))
+        .catch(error => console.error("Erro ao buscar usuários:", error));
+    }
+  };
+
+  // Carrega as vendas e os usuários quando o componente monta e quando os filtros mudam
+  useEffect(() => {
+    fetchSales();
+    fetchUsers();
+  }, [user, token, filterSeller, filterDate]);
 
   if (loading || !token) {
     return <div>Carregando histórico...</div>;
   }
 
-  if (!sales || sales.status === 'erro') {
+  if (sales.status === 'erro') {
     return <div>Não foi possível carregar as vendas.</div>;
   }
-
+  
   return (
     <div className="history-view">
       <h2>Histórico de Vendas</h2>
+      
+      {/* --- CAMPOS DE FILTRO --- */}
+      <div className="filter-controls">
+        <select value={filterSeller} onChange={e => setFilterSeller(e.target.value)}>
+          <option value="">Todos os Vendedores</option>
+          {users.map(u => (
+            <option key={u.uid} value={u.uid}>{u.nome || u.email}</option>
+          ))}
+        </select>
+        <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} />
+        <button onClick={() => { setFilterSeller(''); setFilterDate(''); }}>Limpar Filtros</button>
+      </div>
+
       {sales.length === 0 ? (
         <p>Nenhuma venda registrada ainda.</p>
       ) : (
@@ -44,10 +85,11 @@ export default function HistoryView() {
           {sales.map(sale => (
             <div key={sale.id} className="sale-card">
               <div className="sale-header">
-                <strong>Venda ID:</strong> {sale.id} <br />
-                <strong>Data:</strong> {new Date(sale.dataVenda).toLocaleString('pt-BR')}
+                <strong>Data:</strong> {new Date(sale.dataVenda).toLocaleString('pt-BR')} <br />
+                <strong>Vendedor:</strong> {sale.vendedorNome || 'N/A'}
               </div>
               <div className="sale-body">
+                <strong>Itens:</strong>
                 <ul>
                   {sale.itens.map(item => (
                     <li key={item.produtoId}>
@@ -57,11 +99,9 @@ export default function HistoryView() {
                 </ul>
                 <div className="payment-details">
                   <strong>Pagamento:</strong> {sale.pagamento.metodo}
-                    {sale.pagamento.metodo === 'Crédito' && (
-                        <span>
-                            {' '} - {sale.pagamento.tipoCredito === 'avista' ? 'À vista' : `Parcelado em ${sale.pagamento.parcelas}x`}
-                        </span>
-                    )}
+                  {sale.pagamento.metodo === 'Crédito' && (
+                    <span> - {sale.pagamento.tipoCredito === 'avista' ? 'À vista' : `Parcelado em ${sale.pagamento.parcelas}x`}</span>
+                  )}
                 </div>
               </div>
               <div className="sale-footer">

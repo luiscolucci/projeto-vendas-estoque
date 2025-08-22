@@ -43,3 +43,14 @@
   padding-top: 0.75rem;
   border-top: 1px dashed #eee;
 }
+
+/* Adicione este estilo ao seu HistoryView.css */
+.filter-controls {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #fff;
+}
