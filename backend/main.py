@@ -60,6 +60,7 @@ def admin_required(f):
 def health_check():
     return jsonify({"status": "ok"}), 200
 
+# Rotas de Produto para o Admin (CRUD completo)
 @app.route('/api/produtos', methods=['GET'])
 @token_required
 def listar_produtos():
@@ -116,21 +117,6 @@ def registrar_venda():
     """Registra uma nova venda, atualizando o estoque de forma atômica."""
     try:
         dados_venda = request.get_json()
-        pagamento = dados_venda.get('pagamento', {})
-
-        # --- NOVA VALIDAÇÃO DE PAGAMENTO AQUI ---
-        if not pagamento.get('metodo'):
-            return jsonify({'message': 'Forma de pagamento não informada.'}), 400
-
-        if pagamento.get('metodo') == 'Crédito':
-            tipo_credito = pagamento.get('tipoCredito')
-            if tipo_credito not in ['avista', 'parcelado']:
-                return jsonify({'message': 'Tipo de crédito inválido.'}), 400
-            
-            if tipo_credito == 'parcelado' and (not pagamento.get('parcelas') or pagamento['parcelas'] < 2):
-                 return jsonify({'message': 'Parcelas inválidas para pagamento parcelado.'}), 400
-        # --- FIM DA NOVA VALIDAÇÃO ---
-
 
         @firestore.transactional
         def processar_venda(transaction):
@@ -153,6 +139,7 @@ def registrar_venda():
                     raise Exception(f"Produto com ID {produto_id} não encontrado.")
 
                 produto_data = produto_snapshot.to_dict()
+
                 estoque_atual = (
                     produto_data.get('quantidadeEstoque')
                     if 'quantidadeEstoque' in produto_data
@@ -190,7 +177,7 @@ def registrar_venda():
                 'dataVenda': firestore.SERVER_TIMESTAMP,
                 'vendedorId': g.user['uid'],
                 'vendedorNome': g.user.get('name', g.user.get('email')),
-                'pagamento': pagamento,
+                'pagamento': dados_venda.get('pagamento'),
                 'itens': itens_com_detalhes,
                 'valorTotal': valor_total_venda
             }
@@ -278,9 +265,8 @@ def get_dashboard_data():
         return jsonify(dashboard_data), 200
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 500
-    
-# Adicione esta nova rota (Criação de usuário) ao main.py
 
+# Substitua a sua função create_user por esta
 @app.route('/api/users/create', methods=['POST'])
 @token_required
 @admin_required
@@ -296,14 +282,12 @@ def create_user():
         if role not in ['admin', 'vendedor']:
             return jsonify({'message': 'O papel (role) deve ser "admin" ou "vendedor".'}), 400
 
-        # 1. Cria o usuário no Firebase Authentication
         new_user = auth.create_user(
             email=email,
             password=password,
             display_name=nome
         )
 
-        # 2. Salva as informações adicionais (como o role) no Firestore
         user_data = {
             'email': email,
             'nome': nome,
@@ -315,11 +299,65 @@ def create_user():
         return jsonify({'status': 'sucesso', 'uid': new_user.uid}), 201
 
     except Exception as e:
-        print(f"❌ Erro ao criar usuário: {e}")
-        # Retorna uma mensagem mais amigável se o e-mail já existir
+        # --- NOVIDADE AQUI ---
+        print("\n\n" + "-"*50)
+        print("❌ ERRO NO BACKEND AO TENTAR CRIAR USUÁRIO:")
+        print(f"Tipo do erro: {type(e)}")
+        print(f"Mensagem: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        print("-"*50 + "\n\n")
+        # --- FIM DA NOVIDADE ---
+
         if 'EMAIL_EXISTS' in str(e):
              return jsonify({'status': 'erro', 'message': 'Este e-mail já está cadastrado.'}), 409
         return jsonify({'status': 'erro', 'message': str(e)}), 500
+
+@app.route('/api/users', methods=['GET'])
+@token_required
+@admin_required
+def list_users():
+    """Lista todos os usuários do Firebase Authentication."""
+    try:
+        users = []
+        for user in auth.list_users().iterate_all():
+            users.append({
+                "uid": user.uid,
+                "email": user.email,
+                "nome": user.display_name,
+                "disabled": user.disabled
+            })
+        return jsonify(users), 200
+    except Exception as e:
+        print(f"❌ Erro ao listar usuários: {e}")
+        return jsonify({"status": "erro", "message": str(e)}), 500
+
+@app.route('/api/users/<string:uid>/disable', methods=['PUT'])
+@token_required
+@admin_required
+def disable_user(uid):
+    """Desabilita (bloqueia) um usuário."""
+    try:
+        auth.update_user(uid, disabled=True)
+        print(f"🚫 Usuário {uid} desabilitado com sucesso.")
+        return jsonify({"status": "sucesso", "message": "Usuário bloqueado com sucesso."}), 200
+    except Exception as e:
+        print(f"❌ Erro ao desabilitar usuário: {e}")
+        return jsonify({"status": "erro", "message": str(e)}), 500
+
+@app.route('/api/users/<string:uid>/enable', methods=['PUT'])
+@token_required
+@admin_required
+def enable_user(uid):
+    """Habilita (desbloqueia) um usuário."""
+    try:
+        auth.update_user(uid, disabled=False)
+        print(f"✅ Usuário {uid} habilitado com sucesso.")
+        return jsonify({"status": "sucesso", "message": "Usuário desbloqueado com sucesso."}), 200
+    except Exception as e:
+        print(f"❌ Erro ao habilitar usuário: {e}")
+        return jsonify({"status": "erro", "message": str(e)}), 500
+    
 
 # --- PONTO DE ENTRADA ---
 if __name__ == '__main__':

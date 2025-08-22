@@ -10,7 +10,6 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-
 import { useAuthenticatedFetch } from '../hooks/useAuthenticatedFetch';
 import { useAuth } from '../context/AuthContext';
 import './DashboardView.css';
@@ -29,12 +28,12 @@ export default function DashboardView() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   
+  // CORREÇÃO: Usamos a desestruturação para pegar a função e o token do hook
   const { authenticatedFetch, token } = useAuthenticatedFetch();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
 
   useEffect(() => {
-    // Só tenta buscar os dados se o usuário estiver logado E o token estiver pronto
-    if (user && token) {
+    if (user && token && role === 'admin') {
       authenticatedFetch('http://localhost:5000/api/dashboard-data', { cache: 'no-cache' })
       .then(res => res.json())
       .then(apiData => {
@@ -45,11 +44,18 @@ export default function DashboardView() {
         console.error("Erro ao buscar dados do dashboard:", error);
         setLoading(false);
       });
+    } else {
+      setLoading(false);
+      setData(null);
     }
-  }, [user, token]); // O useEffect roda novamente quando o token for carregado
+  }, [user, token, role]);
 
   if (loading || !token) {
     return <div>Carregando dados do dashboard...</div>;
+  }
+  
+  if (role !== 'admin') {
+    return <div className="no-access-message">Acesso negado. Apenas administradores podem ver o Dashboard.</div>;
   }
   
   if (!data || data.status === 'erro') {

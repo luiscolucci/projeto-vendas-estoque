@@ -1,43 +1,93 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthenticatedFetch } from '../hooks/useAuthenticatedFetch';
-import './UserManagementView.css'; // Criaremos este CSS
+import { useAuth } from '../context/AuthContext';
+import './UserManagementView.css';
 
 export default function UserManagementView() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('vendedor'); // Padrão é 'vendedor'
+  const [role, setRole] = useState('vendedor');
   const [message, setMessage] = useState('');
-  const authenticatedFetch = useAuthenticatedFetch();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // CORREÇÃO: Usamos a desestruturação para pegar a função e o token do hook
+  const { authenticatedFetch, token } = useAuthenticatedFetch();
+  const { user, role: userRole } = useAuth();
+
+  const fetchUsers = () => {
+    setLoading(true);
+    if (user && token && userRole === 'admin') {
+      authenticatedFetch('/api/users')
+        .then(res => res.json())
+        .then(data => {
+          if (data && Array.isArray(data)) {
+            setUsers(data);
+          } else {
+            setUsers([]);
+          }
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error("Erro ao buscar usuários:", error);
+          setLoading(false);
+        });
+    } else {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [user, token, userRole]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage('');
-
     try {
       const response = await authenticatedFetch('/api/users/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nome, email, password, role }),
       });
-
       const data = await response.json();
-
       if (!response.ok) {
         throw new Error(data.message || 'Erro ao criar usuário.');
       }
-
+      
       setMessage(`Usuário ${nome} criado com sucesso!`);
-      // Limpa o formulário
-      setNome('');
-      setEmail('');
-      setPassword('');
-      setRole('vendedor');
-
+      setNome(''); setEmail(''); setPassword(''); setRole('vendedor');
+      fetchUsers();
     } catch (error) {
       setMessage(`Erro: ${error.message}`);
     }
   };
+
+  const handleToggleUserStatus = async (uid, isDisabled) => {
+    const action = isDisabled ? 'enable' : 'disable';
+    if (window.confirm(`Tem certeza que deseja ${isDisabled ? 'desbloquear' : 'bloquear'} este usuário?`)) {
+        try {
+            const response = await authenticatedFetch(`/api/users/${uid}/${action}`, {
+                method: 'PUT',
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message);
+            setMessage(data.message);
+            fetchUsers();
+        } catch (error) {
+            setMessage(`Erro: ${error.message}`);
+        }
+    }
+  };
+
+  if (loading) {
+    return <div>Carregando...</div>;
+  }
+
+  if (userRole !== 'admin') {
+    return <div className="no-access-message">Acesso negado: Somente administradores podem gerenciar usuários.</div>;
+  }
 
   return (
     <div className="user-management-view">
@@ -55,6 +105,39 @@ export default function UserManagementView() {
           <button type="submit">Criar Usuário</button>
         </form>
         {message && <p className="feedback-message">{message}</p>}
+      </section>
+
+      <hr />
+
+      <section className="user-list-section">
+        <h3>Usuários Cadastrados</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map(user => (
+              <tr key={user.uid}>
+                <td>{user.nome || 'N/A'}</td>
+                <td>{user.email}</td>
+                <td>{user.disabled ? 'Bloqueado' : 'Ativo'}</td>
+                <td>
+                  <button 
+                    className={user.disabled ? 'enable-button' : 'disable-button'}
+                    onClick={() => handleToggleUserStatus(user.uid, user.disabled)}
+                  >
+                    {user.disabled ? 'Desbloquear' : 'Bloquear'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
     </div>
   );
