@@ -1,3 +1,4 @@
+import UserManagementView from './components/UserManagementView';
 import { useState, useEffect } from 'react';
 import SalesView from './components/SalesView';
 import HistoryView from './components/HistoryView';
@@ -76,9 +77,14 @@ function App() {
               Produtos
             </button>
           )}
+          {role === 'admin' && (
+            <button onClick={() => setActiveView('users')} className={activeView === 'users' ? 'active' : ''}>
+              Usuários
+            </button>
+          )}
           <button onClick={logout} className="logout-button">
             Sair
-          </button>
+          </button>          
         </nav>
       </header>
       
@@ -93,6 +99,9 @@ function App() {
       </div>
       <div style={{ display: activeView === 'products' ? 'block' : 'none' }}>
         <ProductManagementView products={products} fetchProducts={fetchProducts} />
+      </div>
+      <div style={{ display: activeView === 'users' ? 'block' : 'none' }}>
+        <UserManagementView />
       </div>
     </div>
   );

@@ -55,6 +55,14 @@ export default function HistoryView() {
                     </li>
                   ))}
                 </ul>
+                <div className="payment-details">
+                  <strong>Pagamento:</strong> {sale.pagamento.metodo}
+                    {sale.pagamento.metodo === 'Crédito' && (
+                        <span>
+                            {' '} - {sale.pagamento.tipoCredito === 'avista' ? 'À vista' : `Parcelado em ${sale.pagamento.parcelas}x`}
+                        </span>
+                    )}
+                </div>
               </div>
               <div className="sale-footer">
                 <strong>Total: R$ {sale.valorTotal.toFixed(2)}</strong>

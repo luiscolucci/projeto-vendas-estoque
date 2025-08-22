@@ -1,0 +1,10 @@
+.user-management-view {
+  padding: 2rem;
+}
+.feedback-message {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: #eaf6ff;
+  border: 1px solid #cce5ff;
+}

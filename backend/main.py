@@ -278,6 +278,48 @@ def get_dashboard_data():
         return jsonify(dashboard_data), 200
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 500
+    
+# Adicione esta nova rota (Criação de usuário) ao main.py
+
+@app.route('/api/users/create', methods=['POST'])
+@token_required
+@admin_required
+def create_user():
+    """Cria um novo usuário no Firebase Auth e no Firestore (apenas para admins)."""
+    try:
+        data = request.get_json()
+        email = data['email']
+        password = data['password']
+        nome = data['nome']
+        role = data['role']
+
+        if role not in ['admin', 'vendedor']:
+            return jsonify({'message': 'O papel (role) deve ser "admin" ou "vendedor".'}), 400
+
+        # 1. Cria o usuário no Firebase Authentication
+        new_user = auth.create_user(
+            email=email,
+            password=password,
+            display_name=nome
+        )
+
+        # 2. Salva as informações adicionais (como o role) no Firestore
+        user_data = {
+            'email': email,
+            'nome': nome,
+            'role': role
+        }
+        db.collection('users').document(new_user.uid).set(user_data)
+        
+        print(f"✅ Usuário '{nome}' criado com sucesso com UID: {new_user.uid}")
+        return jsonify({'status': 'sucesso', 'uid': new_user.uid}), 201
+
+    except Exception as e:
+        print(f"❌ Erro ao criar usuário: {e}")
+        # Retorna uma mensagem mais amigável se o e-mail já existir
+        if 'EMAIL_EXISTS' in str(e):
+             return jsonify({'status': 'erro', 'message': 'Este e-mail já está cadastrado.'}), 409
+        return jsonify({'status': 'erro', 'message': str(e)}), 500
 
 # --- PONTO DE ENTRADA ---
 if __name__ == '__main__':
