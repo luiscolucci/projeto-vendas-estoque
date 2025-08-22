@@ -60,7 +60,6 @@ def admin_required(f):
 def health_check():
     return jsonify({"status": "ok"}), 200
 
-# Rotas de Produto para o Admin (CRUD completo)
 @app.route('/api/produtos', methods=['GET'])
 @token_required
 def listar_produtos():
@@ -80,20 +79,11 @@ def listar_produtos():
 def criar_produto():
     try:
         dados_produto = request.get_json()
-
-        # Normalizar nomes dos campos
-        if 'estoque' in dados_produto and 'quantidadeEstoque' not in dados_produto:
-            dados_produto['quantidadeEstoque'] = dados_produto.pop('estoque')
-
-        if 'preco' in dados_produto and 'precoVenda' not in dados_produto:
-            dados_produto['precoVenda'] = dados_produto.pop('preco')
-
         update_time, doc_ref = produtos_ref.add(dados_produto)
         print(f"✅ Produto adicionado com ID: {doc_ref.id}")
         return jsonify({"status": "sucesso", "id": doc_ref.id}), 201
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 400
-
 
 @app.route('/api/produtos/<string:product_id>', methods=['PUT'])
 @token_required
@@ -101,34 +91,6 @@ def criar_produto():
 def atualizar_produto(product_id):
     try:
         dados_atualizacao = request.get_json()
-
-        # Normalizar nomes dos campos
-        if 'estoque' in dados_atualizacao:
-            dados_atualizacao['quantidadeEstoque'] = dados_atualizacao.pop('estoque')
-
-        if 'preco' in dados_atualizacao:
-            dados_atualizacao['precoVenda'] = dados_atualizacao.pop('preco')
-
-        produtos_ref.document(product_id).update(dados_atualizacao)
-        print(f"🔄 Produto atualizado com ID: {product_id}")
-        return jsonify({"status": "sucesso", "id": product_id}), 200
-    except Exception as e:
-        return jsonify({"status": "erro", "message": str(e)}), 400
-
-@app.route('/api/produtos/<string:product_id>', methods=['PUT'])
-@token_required
-@admin_required
-def atualizar_produto_route(product_id):   # <<< novo nome da função
-    try:
-        dados_atualizacao = request.get_json()
-
-        # Normalizar nomes dos campos
-        if 'estoque' in dados_atualizacao:
-            dados_atualizacao['quantidadeEstoque'] = dados_atualizacao.pop('estoque')
-
-        if 'preco' in dados_atualizacao:
-            dados_atualizacao['precoVenda'] = dados_atualizacao.pop('preco')
-
         produtos_ref.document(product_id).update(dados_atualizacao)
         print(f"🔄 Produto atualizado com ID: {product_id}")
         return jsonify({"status": "sucesso", "id": product_id}), 200
@@ -154,6 +116,21 @@ def registrar_venda():
     """Registra uma nova venda, atualizando o estoque de forma atômica."""
     try:
         dados_venda = request.get_json()
+        pagamento = dados_venda.get('pagamento', {})
+
+        # --- NOVA VALIDAÇÃO DE PAGAMENTO AQUI ---
+        if not pagamento.get('metodo'):
+            return jsonify({'message': 'Forma de pagamento não informada.'}), 400
+
+        if pagamento.get('metodo') == 'Crédito':
+            tipo_credito = pagamento.get('tipoCredito')
+            if tipo_credito not in ['avista', 'parcelado']:
+                return jsonify({'message': 'Tipo de crédito inválido.'}), 400
+            
+            if tipo_credito == 'parcelado' and (not pagamento.get('parcelas') or pagamento['parcelas'] < 2):
+                 return jsonify({'message': 'Parcelas inválidas para pagamento parcelado.'}), 400
+        # --- FIM DA NOVA VALIDAÇÃO ---
+
 
         @firestore.transactional
         def processar_venda(transaction):
@@ -176,8 +153,6 @@ def registrar_venda():
                     raise Exception(f"Produto com ID {produto_id} não encontrado.")
 
                 produto_data = produto_snapshot.to_dict()
-
-                # Aceita tanto "estoque" quanto "quantidadeEstoque"
                 estoque_atual = (
                     produto_data.get('quantidadeEstoque')
                     if 'quantidadeEstoque' in produto_data
@@ -192,7 +167,6 @@ def registrar_venda():
                     "novo_estoque": estoque_atual - quantidade_vendida
                 })
 
-                # Aceita tanto "precoVenda" quanto "preco"
                 preco_unitario = (
                     produto_data.get('precoVenda')
                     if 'precoVenda' in produto_data
@@ -209,16 +183,14 @@ def registrar_venda():
                     'precoUnitarioVenda': preco_unitario
                 })
 
-            # Atualiza os estoques
             for prod in produtos_para_atualizar:
                 transaction.update(prod["ref"], {'quantidadeEstoque': prod["novo_estoque"]})
 
-            # Cria registro da venda
             registro_venda = {
                 'dataVenda': firestore.SERVER_TIMESTAMP,
                 'vendedorId': g.user['uid'],
                 'vendedorNome': g.user.get('name', g.user.get('email')),
-                'pagamento': dados_venda.get('pagamento'),
+                'pagamento': pagamento,
                 'itens': itens_com_detalhes,
                 'valorTotal': valor_total_venda
             }
@@ -235,7 +207,6 @@ def registrar_venda():
     except Exception as e:
         print(f"❌ Erro ao registrar venda: {e}")
         return jsonify({"status": "erro", "message": str(e)}), 400
-
 
 @app.route('/api/vendas', methods=['GET'])
 @token_required
@@ -254,8 +225,6 @@ def listar_vendas():
         return jsonify(todas_vendas), 200
     except Exception as e:
         return jsonify({"status": "erro", "message": str(e)}), 500
-
-# --- ROTA DE DASHBOARD ---
 
 @app.route('/api/dashboard-data', methods=['GET'])
 @token_required
