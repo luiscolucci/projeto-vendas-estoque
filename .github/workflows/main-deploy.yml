@@ -29,7 +29,7 @@ jobs:
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
           # CORREÇÃO AQUI: o nome do segredo é o que definimos
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}'
           projectId: lume-cume 
           channelId: live
           entryPoint: ./frontend
