@@ -6,6 +6,7 @@ import firebase_admin
 from firebase_admin import auth, credentials, firestore
 from flask import Flask, jsonify, request, g
 from flask_cors import CORS
+from datetime import datetime, timedelta
 
 # --- INICIALIZAÇÃO ---
 app = Flask(__name__)
@@ -194,12 +195,32 @@ def registrar_venda():
 @app.route('/api/vendas', methods=['GET'])
 @token_required
 def listar_vendas():
+    """Busca e retorna todas as vendas registradas com filtros."""
     try:
+        query = vendas_ref
+        
+        # --- LÓGICA DOS FILTROS CORRIGIDA AQUI ---
+        # Filtro por vendedor (se o parâmetro 'sellerId' estiver na URL)
+        seller_id = request.args.get('sellerId')
+        if seller_id:
+            query = query.where('vendedorId', '==', seller_id)
+
+        # Filtro por data (se o parâmetro 'date' estiver na URL)
+        sale_date = request.args.get('date')
+        if sale_date:
+            try:
+                data_inicio = datetime.fromisoformat(sale_date).replace(hour=0, minute=0, second=0, microsecond=0)
+                data_fim = data_inicio + timedelta(days=1)
+                query = query.where('dataVenda', '>=', data_inicio).where('dataVenda', '<', data_fim)
+            except ValueError:
+                return jsonify({"status": "erro", "message": "Formato de data inválido. Use AAAA-MM-DD."}), 400
+        # --- FIM DA LÓGICA DOS FILTROS ---
+        
+        # Ordena a consulta
+        query = query.order_by('dataVenda', direction=firestore.Query.DESCENDING)
+
         todas_vendas = []
-        vendas_stream = vendas_ref.order_by(
-            'dataVenda', direction=firestore.Query.DESCENDING
-        ).stream()
-        for venda in vendas_stream:
+        for venda in query.stream():
             venda_data = venda.to_dict()
             venda_data['id'] = venda.id
             if 'dataVenda' in venda_data and venda_data['dataVenda']:
@@ -207,6 +228,7 @@ def listar_vendas():
             todas_vendas.append(venda_data)
         return jsonify(todas_vendas), 200
     except Exception as e:
+        print(f"❌ Erro ao listar vendas: {e}")
         return jsonify({"status": "erro", "message": str(e)}), 500
 
 @app.route('/api/dashboard-data', methods=['GET'])
