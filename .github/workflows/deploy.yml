@@ -1,15 +1,11 @@
-# .github/workflows/main-deploy.yml
 name: Deploy to Firebase and Cloud Run
-
 on:
   push:
     branches:
       - main
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
@@ -18,7 +14,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-      
+
       - name: Install and Build Frontend
         run: |
           npm install
@@ -29,10 +25,9 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}' # Corrigido o nome do segredo
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}'
           projectId: lume-cume
           channelId: live
-          entryPoint: ./ # Corrigido o entryPoint
 
       - name: Set up Google Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v1'
@@ -42,10 +37,10 @@ jobs:
 
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
-        
+
       - name: Build and Push Docker Image
         run: gcloud builds submit ./backend --tag gcr.io/lume-cume/backend-api --project=lume-cume
-      
+
       - name: Deploy Backend to Cloud Run
         run: |
           gcloud run deploy backend-api \
