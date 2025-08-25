@@ -45,13 +45,11 @@ jobs:
         run: gcloud auth configure-docker --quiet
 
       - name: Build and Push Docker Image
-        run: |
-          gcloud builds submit ./backend --tag gcr.io/lume-cume/backend-api
+        run: gcloud builds submit ./backend --tag gcr.io/lume-cume/backend-api
 
       - name: Deploy Backend to Cloud Run
-        run: |
-          gcloud run deploy backend-api \
+        run: gcloud run deploy backend-api \
             --image gcr.io/lume-cume/backend-api \
-            --region us-central1 \
+            --region southamerica-east1 \
             --platform managed \
             --allow-unauthenticated
