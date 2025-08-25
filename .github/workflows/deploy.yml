@@ -21,7 +21,10 @@ jobs:
       
       - name: Install and Build Frontend
       # Entra na pasta frontend, instala as dependências e cria a pasta 'dist'
-        run: cd frontend && npm install && npm run build
+        run: |
+          npm install
+          npm run build
+        working-directory: ./frontend
 
       - name: Deploy Frontend to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
