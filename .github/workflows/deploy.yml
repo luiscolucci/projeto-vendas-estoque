@@ -4,7 +4,7 @@ name: Deploy to Firebase and Cloud Run
 on:
   push:
     branches:
-      - main  # O workflow roda sempre que houver um push no branch 'main'
+      - main
 
 jobs:
   deploy:
@@ -20,7 +20,6 @@ jobs:
           node-version: '20'
       
       - name: Install and Build Frontend
-      # Entra na pasta frontend, instala as dependências e cria a pasta 'dist'
         run: |
           npm install
           npm run build
@@ -30,12 +29,12 @@ jobs:
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}'
-          projectId: lume-cume 
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' # Corrigido o nome do segredo
+          projectId: lume-cume
           channelId: live
-          entryPoint: ./frontend/ # raiz do repo (onde está o firebase.json)
+          entryPoint: ./ # Corrigido o entryPoint
 
-      - name: Setup Google Cloud SDK
+      - name: Set up Google Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v1'
         with:
           project_id: lume-cume
@@ -53,5 +52,5 @@ jobs:
             --image gcr.io/lume-cume/backend-api \
             --region southamerica-east1 \
             --platform managed \
-            --allow-unauthenticated
+            --allow-unauthenticated \
             --project=lume-cume
