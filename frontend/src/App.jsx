@@ -12,18 +12,19 @@ import './App.css';
 function App() {
   const [activeView, setActiveView] = useState('sales');
   const [products, setProducts] = useState([]);
-  const { user, role, loading, logout } = useAuth();
-  // --- CORREÇÃO AQUI ---
-  const { authenticatedFetch, token } = useAuthenticatedFetch();
+  const { user, role, loading, logout, error: authError } = useAuth();
+  const { authenticatedFetch, token, error: fetchError } = useAuthenticatedFetch();
 
   const fetchProducts = async () => {
     if (user && token) {
       try {
+        console.log('Tentando buscar produtos em /api/produtos com token:', token);
         const response = await authenticatedFetch('/api/produtos', {
-            method: 'GET',
-            headers: { 'Cache-Control': 'no-cache' }
+          method: 'GET',
+          headers: { 'Cache-Control': 'no-cache' },
         });
         const data = await response.json();
+        console.log('Produtos recebidos:', data);
         setProducts(data);
       } catch (error) {
         console.error('Erro ao buscar produtos:', error);
@@ -34,15 +35,28 @@ function App() {
 
   useEffect(() => {
     if (user && token) {
+      console.log('useEffect: Usuário e token disponíveis. Iniciando fetch de produtos.');
       fetchProducts();
+    } else {
+      console.log('useEffect: Usuário ou token não disponíveis.');
     }
   }, [user, token]);
 
+  if (authError || fetchError) {
+    return (
+      <div style={{ color: 'red', fontSize: '24px', padding: '20px' }}>
+        Erro: {authError || fetchError}
+      </div>
+    );
+  }
+
   if (loading || !token) {
-    return <div>Carregando...</div>;
+    console.log('Renderizando Carregando... (loading:', loading, 'token:', token);
+    return <div style={{ color: 'blue', fontSize: '24px' }}>Carregando...</div>;
   }
 
   if (!user) {
+    console.log('Renderizando LoginView (usuário não logado).');
     return (
       <div className="app-container">
         <header>
@@ -55,6 +69,7 @@ function App() {
     );
   }
 
+  console.log('Renderizando App com usuário:', user.uid, 'role:', role);
   return (
     <div>
       <header>

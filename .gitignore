@@ -1,5 +1,6 @@
 # Ambiente Virtual do Python
 venv/
+.venv_Linux/
 __pycache__/
 
 # Chave de serviço do Firebase (MUITO IMPORTANTE)
@@ -12,3 +13,4 @@ firebase-service-account.json
 .DS_Store
 .vscode/
 .idea/
+.github

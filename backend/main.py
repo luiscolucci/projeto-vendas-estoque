@@ -1,7 +1,6 @@
 import os
 from datetime import datetime
 from functools import wraps
-
 import firebase_admin
 from firebase_admin import auth, credentials, firestore
 from flask import Flask, jsonify, request, g
@@ -10,7 +9,15 @@ from datetime import datetime, timedelta
 
 # --- INICIALIZAÇÃO ---
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["*"])
+
+@app.route("/")
+def hello_world():
+    return "Hello from Flask Backend!"
+
+@app.route("/health")
+def health_check():
+    return jsonify({"status": "ok"}), 200
 
 cred = credentials.Certificate("firebase-service-account.json")
 firebase_admin.initialize_app(cred)
@@ -57,9 +64,9 @@ def admin_required(f):
 
 # --- ROTAS DA API ---
 
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    return jsonify({"status": "ok"}), 200
+#@app.route('/api/health', methods=['GET'])
+#def health_check():
+#    return jsonify({"status": "ok"}), 200
 
 @app.route('/api/produtos', methods=['GET'])
 @token_required
@@ -368,4 +375,5 @@ def enable_user(uid):
 
 # --- PONTO DE ENTRADA ---
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)

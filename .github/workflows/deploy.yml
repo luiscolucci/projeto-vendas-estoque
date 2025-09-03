@@ -1,55 +1,85 @@
-name: Deploy to Firebase and Cloud Run
+# Nome do workflow que aparecerá no GitHub Actions
+name: Deploy Frontend and Backend
+
+# Gatilho: Este workflow roda automaticamente em qualquer push para a branch 'main'
 on:
   push:
     branches:
       - main
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
 
+# Define os jobs (tarefas) que serão executados
+jobs:
+  # --- JOB PARA O FRONTEND ---
+  deploy-frontend:
+    runs-on: ubuntu-latest # Define a máquina virtual que executará o job
+    steps:
+      # 1. Baixa o código do seu repositório para a máquina virtual
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Configura o ambiente Node.js na versão 20
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
+      # 3. Cria o arquivo .env para o frontend com a URL do backend
+      - name: Create .env file for Frontend
+        run: echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" > ./frontend/.env
+
+      # 4. Instala as dependências e compila o projeto do frontend
       - name: Install and Build Frontend
         run: |
-          npm install
+          npm ci # 'ci' é mais rápido e seguro para automação que 'install'
           npm run build
-        working-directory: ./frontend
+        working-directory: ./frontend # Executa os comandos dentro da pasta do frontend
 
-      - name: Deploy Frontend to Firebase Hosting
+      # 5. Implanta o frontend no Firebase Hosting
+      - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}'
+          repoToken: '${{ secrets.GITHUB_TOKEN }}' # Token padrão do GitHub
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}' # Segredo que você precisa criar no GitHub
           projectId: lume-cume
-          channelId: live
+          channelId: live # <-- ESTA É A CORREÇÃO
 
-      # --- SEÇÃO CORRIGIDA ---
+  # --- JOB PARA O BACKEND ---
+  deploy-backend:
+    runs-on: ubuntu-latest
+    # O 'needs' foi removido para que o backend e o frontend sejam implantados em paralelo, economizando tempo.
+    # Se você precisar que um espere pelo outro, adicione: needs: deploy-frontend
+    steps:
+      # 1. Baixa o código do seu repositório
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Autentica com o Google Cloud usando sua conta de serviço
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v2'
         with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+          credentials_json: '${{ secrets.GCP_SA_KEY }}' # Segredo que você já criou
 
-      - name: Set up Google Cloud SDK
+      # 3. Configura a ferramenta 'gcloud'
+      - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
-      # --- FIM DA SEÇÃO CORRIGIDA ---
+        with:
+          project_id: lume-cume-470111
 
-      - name: Configure Docker
-        run: gcloud auth configure-docker --quiet
+      # 4. Constrói a imagem Docker usando o Cloud Build (sem esperar pelos logs)
+      - name: Build and Push Docker image
+        run: |
+          gcloud builds submit ./backend \
+            --tag gcr.io/lume-cume-470111/backend-api \
+            --project=lume-cume-470111 \
+            --async
 
-      - name: Build and Push Docker Image
-        run: gcloud builds submit ./backend --tag gcr.io/lume-cume/backend-api --project=lume-cume
-
-      - name: Deploy Backend to Cloud Run
+      # 5. Implanta a imagem no Cloud Run
+      - name: Deploy to Cloud Run
         run: |
           gcloud run deploy backend-api \
-            --image gcr.io/lume-cume/backend-api \
+            --image gcr.io/lume-cume-470111/backend-api \
             --region southamerica-east1 \
             --platform managed \
             --allow-unauthenticated \
-            --project=lume-cume
+            --project=lume-cume-470111
+

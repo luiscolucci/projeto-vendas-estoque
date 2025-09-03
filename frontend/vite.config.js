@@ -1,23 +1,27 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
-//export default defineConfig({
-  //plugins: [react()],
-//})
-
-// https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // --- ADIÇÃO AQUI ---
   server: {
     proxy: {
-      // Qualquer requisição que comece com /api será redirecionada
       '/api': {
-        target: 'http://localhost:5000', // O endereço do nosso backend
+        target: 'http://localhost:5000', // Para desenvolvimento local
         changeOrigin: true,
       },
-    }
-  }
-  // --- FIM DA ADIÇÃO ---
+    },
+  },
+  build: {
+    outDir: 'dist',  // Diretório de saída padrão
+    assetsDir: 'assets',  // Subdiretório para assets
+    base: '/',
+    rollupOptions: {
+      output: {
+        // Garante que os nomes hashados sejam consistentes
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
+      },
+    },
+  },
 })
