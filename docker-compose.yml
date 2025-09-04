@@ -1,64 +1,55 @@
+version: '3.8'
+
 services:
-  lume-cume-backend:
+  backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "5000:5000"
+    # A porta não precisa ser exposta para o host,
+    # pois o proxy NGINX irá intermediar a comunicação.
+    # ports:
+    #   - "5000:8080" 
     volumes:
+      # Monta o código do backend para desenvolvimento (opcional, remova em produção)
       - ./backend:/app
-      - backend-data:/app/data
+      # Monta a chave de serviço do Firebase
+      - ./backend/firebase-service-account.json:/app/firebase-service-account.json:ro
     environment:
       - FLASK_ENV=production
+      - PORT=8080 # O Gunicorn usará esta porta
       - GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
     networks:
       - app-network
+    # Healthcheck corrigido para usar a porta interna do container
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
-  lume-cume-frontend:
+  frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "8080:80"
-    volumes:
-      - ./frontend:/app
-    depends_on:
-      - lume-cume-backend
+    # A porta também não precisa ser exposta, o proxy cuida disso.
     networks:
       - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
-  vendas-estoque-proxy:
+  proxy:
     build:
-      context: ./nginx
+      context: ./proxy # Assumindo que a pasta se chama 'proxy'
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      # Expõe a porta 80 do proxy para a porta 8080 do seu computador
+      - "8080:80"
     depends_on:
-      - lume-cume-frontend
-      - lume-cume-backend
+      backend:
+        condition: service_healthy # Espera o backend estar saudável
+      frontend:
+        condition: service_started # Espera o frontend iniciar
     networks:
       - app-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
-volumes:
-  backend-data:
 
 networks:
   app-network:
