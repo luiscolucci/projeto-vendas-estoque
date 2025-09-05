@@ -3,7 +3,7 @@ import { useAuthenticatedFetch } from '../hooks/useAuthenticatedFetch';
 import { useAuth } from '../context/AuthContext';
 import './HistoryView.css';
 
-// 1. A variável de ambiente é importada aqui
+// 1. A variável de ambiente é lida aqui
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function HistoryView({ role }) {
@@ -45,7 +45,7 @@ export default function HistoryView({ role }) {
 
   const fetchUsers = () => {
     if (user && token && role === 'admin') {
-      // 3. A URL relativa foi atualizada para usar a variável (mais seguro)
+      // 3. A URL relativa também foi atualizada para usar a variável (mais seguro e consistente)
       authenticatedFetch(`${API_BASE_URL}/users`)
         .then(res => res.json())
         .then(data => setUsers(data))
