@@ -31,14 +31,20 @@ jobs:
           echo "VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}" >> ./frontend/.env.production
         shell: bash
 
-      # 4. Instala as dependências e compila o projeto do frontend
+      # 4. (PASSO DE DEPURAÇÃO) Verifica o conteúdo do arquivo .env.production
+      # Este passo nos mostrará qual chave de API está sendo usada no build.
+      - name: Verify .env.production file
+        run: cat ./frontend/.env.production
+        shell: bash
+
+      # 5. Instala as dependências e compila o projeto do frontend
       - name: Install and Build Frontend
         run: |
           npm ci
           npm run build
         working-directory: ./frontend
 
-      # 5. Implanta o frontend no Firebase Hosting
+      # 6. Implanta o frontend no Firebase Hosting
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -46,3 +52,4 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}'
           projectId: lume-cume
           channelId: live
+
