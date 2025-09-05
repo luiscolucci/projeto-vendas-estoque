@@ -3,6 +3,9 @@ import { useAuthenticatedFetch } from '../hooks/useAuthenticatedFetch';
 import { useAuth } from '../context/AuthContext';
 import './HistoryView.css';
 
+// 1. A variável de ambiente é importada aqui
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export default function HistoryView({ role }) {
   const [sales, setSales] = useState([]);
   const [users, setUsers] = useState([]); // Novo estado para a lista de usuários
@@ -17,7 +20,8 @@ export default function HistoryView({ role }) {
 
   const fetchSales = () => {
     setLoading(true);
-    let url = 'http://localhost:5000/api/vendas?';
+    // 2. A URL hardcoded foi substituída pela variável
+    let url = `${API_BASE_URL}/vendas?`;
     if (filterSeller) {
       url += `sellerId=${filterSeller}&`;
     }
@@ -41,7 +45,8 @@ export default function HistoryView({ role }) {
 
   const fetchUsers = () => {
     if (user && token && role === 'admin') {
-      authenticatedFetch('/api/users')
+      // 3. A URL relativa foi atualizada para usar a variável (mais seguro)
+      authenticatedFetch(`${API_BASE_URL}/users`)
         .then(res => res.json())
         .then(data => setUsers(data))
         .catch(error => console.error("Erro ao buscar usuários:", error));
