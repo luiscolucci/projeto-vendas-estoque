@@ -14,35 +14,29 @@ jobs:
   deploy-backend:
     runs-on: ubuntu-latest
     steps:
-      # 1. Baixa o código do seu repositório
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Autentica com o Google Cloud
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v2'
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
-      # 3. Configura a ferramenta 'gcloud'
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
         with:
           project_id: lume-cume-470111
 
-      # 4. Cria o arquivo de credenciais do Firebase Admin a partir do Secret
       - name: Create Firebase Service Account File
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > ./backend/firebase-service-account.json
         shell: bash
 
-      # 5. Constrói a imagem Docker e envia para o Google Container Registry
       - name: Build and Push Docker image
         run: |
           gcloud builds submit ./backend \
             --tag gcr.io/lume-cume-470111/backend-api \
             --project=lume-cume-470111
 
-      # 6. Implanta a imagem no Cloud Run
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy backend-api \

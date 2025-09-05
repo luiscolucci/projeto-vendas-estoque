@@ -1,7 +1,7 @@
-# .github/workflows/deploy-frontend.yml
+# .github/workflows/deploy.yml
 
 # Nome do workflow que aparecerá no GitHub Actions
-name: Deploy Frontend
+name: Deploy Frontend and Backend
 
 # Gatilho: Este workflow roda automaticamente em qualquer push para a branch 'main'
 on:
@@ -9,42 +9,36 @@ on:
     branches:
       - main
 
-# Define o job (tarefa) que será executado
+# Define os jobs (tarefas) que serão executados
 jobs:
+  # --- JOB PARA O FRONTEND ---
   deploy-frontend:
     runs-on: ubuntu-latest
     steps:
-      # 1. Baixa o código do seu repositório
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Configura o ambiente Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # 3. Cria o arquivo .env.production para o frontend com as chaves seguras
       - name: Create .env.production file for Frontend
         run: |
           echo "VITE_API_BASE_URL=${{ secrets.VITE_API_URL }}" > ./frontend/.env.production
           echo "VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}" >> ./frontend/.env.production
         shell: bash
 
-      # 4. (PASSO DE DEPURAÇÃO) Verifica o conteúdo do arquivo .env.production
-      # Este passo nos mostrará qual chave de API está sendo usada no build.
       - name: Verify .env.production file
         run: cat ./frontend/.env.production
         shell: bash
 
-      # 5. Instala as dependências e compila o projeto do frontend
       - name: Install and Build Frontend
         run: |
           npm ci
           npm run build
         working-directory: ./frontend
 
-      # 6. Implanta o frontend no Firebase Hosting
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -52,4 +46,3 @@ jobs:
           firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}'
           projectId: lume-cume
           channelId: live
-
