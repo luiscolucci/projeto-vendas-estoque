@@ -10,7 +10,6 @@ firebase-service-account.json
 .env
 .env.development
 .env.test
-.env.production
 
 
 # Arquivos de sistema operacional e IDEs
