@@ -1,5 +1,7 @@
+# .github/workflows/deploy.yml
+
 # Nome do workflow que aparecerá no GitHub Actions
-name: Deploy Backend
+name: Deploy Frontend and Backend
 
 # Gatilho: Este workflow roda automaticamente em qualquer push para a branch 'main'
 on:
@@ -8,15 +10,53 @@ on:
       - main
 
 # Define os jobs (tarefas) que serão executados
-jobs: # <-- ESTA É A LINHA PRINCIPAL QUE FALTAVA
-  deploy-backend: # <-- Agora esta linha está indentada corretamente abaixo de "jobs:"
+jobs:
+  # --- JOB PARA O FRONTEND ---
+  deploy-frontend:
     runs-on: ubuntu-latest
     steps:
       # 1. Baixa o código do seu repositório
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Autentica com o Google Cloud usando sua conta de serviço
+      # 2. Configura o ambiente Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      # 3. Cria o arquivo .env.production para o frontend com as chaves seguras
+      - name: Create .env.production file for Frontend
+        run: |
+          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_URL }}" > ./frontend/.env.production
+          echo "VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}" >> ./frontend/.env.production
+        shell: bash
+
+      # 4. Instala as dependências e compila o projeto do frontend
+      - name: Install and Build Frontend
+        run: |
+          npm ci
+          npm run build
+        working-directory: ./frontend
+
+      # 5. Implanta o frontend no Firebase Hosting
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}'
+          projectId: lume-cume
+          channelId: live
+
+  # --- JOB PARA O BACKEND ---
+  deploy-backend:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Baixa o código do seu repositório
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Autentica com o Google Cloud
       - name: Authenticate to Google Cloud
         uses: 'google-github-actions/auth@v2'
         with:
@@ -26,11 +66,11 @@ jobs: # <-- ESTA É A LINHA PRINCIPAL QUE FALTAVA
       - name: Set up Cloud SDK
         uses: 'google-github-actions/setup-gcloud@v2'
         with:
-          project_id: lume-cume-470111 # Use o ID do projeto correto aqui
+          project_id: lume-cume-470111
 
-      # 4. Cria o arquivo de credenciais a partir do Secret do GitHub
+      # 4. Cria o arquivo de credenciais do Firebase Admin a partir do Secret
       - name: Create Firebase Service Account File
-        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_LUME_CUME }}' > ./backend/firebase-service-account.json
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > ./backend/firebase-service-account.json
         shell: bash
 
       # 5. Constrói a imagem Docker e envia para o Google Container Registry
