@@ -14,4 +14,5 @@ ENV GOOGLE_APPLICATION_CREDENTIALS=/app/firebase-service-account.json
 EXPOSE 8080
 
 # Inicia a aplicação com Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "main:app"]
+#CMD ["gunicorn", "--bind", "0.0.0.0:8080", "main:app"]
+CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 0 main:app
