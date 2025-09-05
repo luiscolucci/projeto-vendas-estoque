@@ -10,7 +10,13 @@ from datetime import datetime, timedelta
 
 # --- INICIALIZAÇÃO ---
 app = Flask(__name__)
-CORS(app)
+#CORS(app)
+
+CORS(app, resources={r"/api/*": {
+    "origins": "*",  # Permite qualquer origem. Para mais segurança, pode usar: ["https://lume-cume.web.app"]
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["Authorization", "Content-Type"]
+}})
 
 cred = credentials.Certificate("firebase-service-account.json")
 firebase_admin.initialize_app(cred)
