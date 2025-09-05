@@ -24,6 +24,9 @@ ChartJS.register(
   Legend
 );
 
+// 1. A variável de ambiente é importada aqui
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export default function DashboardView() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,7 +37,8 @@ export default function DashboardView() {
 
   useEffect(() => {
     if (user && token && role === 'admin') {
-      authenticatedFetch('http://localhost:5000/api/dashboard-data', { cache: 'no-cache' })
+      // 2. A URL hardcoded foi substituída pela variável
+      authenticatedFetch(`${API_BASE_URL}/dashboard-data`, { cache: 'no-cache' })
       .then(res => res.json())
       .then(apiData => {
         setData(apiData);
@@ -90,7 +94,7 @@ export default function DashboardView() {
           <h4>Total de Vendas</h4>
           <p>{data.resumo.totalVendas}</p>
         </div>
-         <div className="card">
+          <div className="card">
           <h4>Itens Vendidos</h4>
           <p>{data.resumo.totalItensVendidos}</p>
         </div>
