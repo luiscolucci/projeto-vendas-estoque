@@ -8,6 +8,10 @@ firebase-service-account.json
 
 # Arquivos de variáveis de ambiente
 .env
+.env.development
+.env.test
+.env.production
+
 
 # Arquivos de sistema operacional e IDEs
 .DS_Store
